@@ -128,7 +128,6 @@ func (c *Client) stream(ctx context.Context, method, path string, data any, fn f
 		if err != nil {
 			return err
 		}
-
 		buf = bytes.NewBuffer(bts)
 	}
 
@@ -203,7 +202,7 @@ func (c *Client) GenerateChat(ctx context.Context, req *ChatRequest, fn ChatResp
 	return c.stream(ctx, http.MethodPost, "/api/chat", req, func(bts []byte) error {
 		var resp ChatResponse
 		if err := json.Unmarshal(bts, &resp); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal response: %v Response was:\n%s", err, string(bts))
 		}
 
 		return fn(resp)

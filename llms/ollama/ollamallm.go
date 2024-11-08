@@ -109,6 +109,7 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 		Messages: chatMsgs,
 		Options:  ollamaOptions,
 		Stream:   opts.StreamingFunc != nil,
+		Tools:    convertTools(opts.Tools),
 	}
 
 	keepAlive := o.options.keepAlive
@@ -156,6 +157,21 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 				"TotalTokens":      resp.EvalCount + resp.PromptEvalCount,
 			},
 		},
+	}
+
+	if resp.Message != nil && len(resp.Message.ToolCalls) > 0 {
+		toolCalls := make([]llms.ToolCall, 0, len(resp.Message.ToolCalls))
+		for _, tc := range resp.Message.ToolCalls {
+			toolCalls = append(toolCalls, llms.ToolCall{
+				ID:   tc.Function.Name, // Using function name as ID
+				Type: "function",
+				FunctionCall: &llms.FunctionCall{
+					Name:      tc.Function.Name,
+					Arguments: ollamaclient.ArgsToString(tc.Function.Arguments),
+				},
+			})
+		}
+		choices[0].ToolCalls = toolCalls
 	}
 
 	response := &llms.ContentResponse{Choices: choices}
@@ -229,4 +245,49 @@ func makeOllamaOptionsFromOptions(ollamaOptions ollamaclient.Options, opts llms.
 	ollamaOptions.PresencePenalty = float32(opts.PresencePenalty)
 
 	return ollamaOptions
+}
+
+func convertTools(tools []llms.Tool) []ollamaclient.Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	ollamaTools := make([]ollamaclient.Tool, 0, len(tools))
+	for _, tool := range tools {
+		// Currently Ollama only supports function tools
+		if tool.Type != "function" || tool.Function == nil {
+			continue
+		}
+
+		ollamaTool := ollamaclient.Tool{
+			Type: tool.Type,
+			Function: ollamaclient.Function{
+				Name:        tool.Function.Name,
+				Description: tool.Function.Description,
+			},
+		}
+
+		// Convert parameters if they exist
+		if params, ok := tool.Function.Parameters.(map[string]interface{}); ok {
+			props, ok := params["properties"].(map[string]interface{})
+			ps := params
+			if ok {
+				ps = props
+			}
+
+			ollamaTool.Function.Parameters = ollamaclient.FunctionParameters{
+				Type:       "object", // Ollama expects this to be "object"
+				Properties: ps,
+			}
+
+			// Extract required fields if present
+			if required, ok := params["required"].([]string); ok {
+				ollamaTool.Function.Parameters.Required = required
+			}
+		}
+
+		ollamaTools = append(ollamaTools, ollamaTool)
+	}
+
+	return ollamaTools
 }

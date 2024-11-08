@@ -1,7 +1,9 @@
 package ollamaclient
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 )
@@ -41,9 +43,10 @@ type GenerateRequest struct {
 type ImageData []byte
 
 type Message struct {
-	Role    string      `json:"role"` // one of ["system", "user", "assistant"]
-	Content string      `json:"content"`
-	Images  []ImageData `json:"images,omitempty"`
+	Role      string      `json:"role"` // one of ["system", "user", "assistant"]
+	Content   string      `json:"content"`
+	Images    []ImageData `json:"images,omitempty"`
+	ToolCalls []ToolCall  `json:"tool_calls,omitempty"`
 }
 
 type ChatRequest struct {
@@ -51,6 +54,7 @@ type ChatRequest struct {
 	Messages  []*Message `json:"messages"`
 	Stream    bool       `json:"stream,omitempty"`
 	Format    string     `json:"format"`
+	Tools     []Tool     `json:"tools,omitempty"`
 	KeepAlive string     `json:"keep_alive,omitempty"`
 
 	Options Options `json:"options"`
@@ -95,7 +99,8 @@ type ChatResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	Message   *Message  `json:"message,omitempty"`
 
-	Done bool `json:"done"`
+	Done       bool   `json:"done"`
+	DoneReason string `json:"done_reason,omitempty"`
 
 	Metrics
 }
@@ -167,4 +172,40 @@ type Options struct {
 	MirostatEta      float32 `json:"mirostat_eta,omitempty"`
 	TopP             float32 `json:"top_p,omitempty"`
 	PenalizeNewline  bool    `json:"penalize_newline,omitempty"`
+}
+
+// Add these new types
+type FunctionParameters struct {
+	Type       string                 `json:"type"`
+	Properties map[string]interface{} `json:"properties"`
+	Required   []string               `json:"required,omitempty"`
+}
+
+type Function struct {
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Parameters  FunctionParameters `json:"parameters"`
+}
+
+type Tool struct {
+	Type     string   `json:"type"`
+	Function Function `json:"function"`
+}
+
+type FunctionCall struct {
+	Name      string `json:"name"`
+	Arguments any    `json:"arguments"`
+}
+
+type ToolCall struct {
+	Function FunctionCall `json:"function"`
+}
+
+func ArgsToString(args any) string {
+	asJson, err := json.Marshal(args)
+	if err != nil {
+		log.Println("args conversion error:", err)
+		return fmt.Sprintf("Error converting args to string: %v", err)
+	}
+	return string(asJson)
 }
