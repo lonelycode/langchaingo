@@ -111,7 +111,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/milvus-io/milvus-proto/go-api/v2 v2.3.5 // indirect
+	github.com/milvus-io/milvus-proto/go-api/v2 v2.3.6 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
@@ -213,7 +213,7 @@ require (
 	github.com/nlpodyssey/cybertron v0.2.1
 	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/pgvector/pgvector-go v0.1.1
-	github.com/pinecone-io/go-pinecone v0.4.1
+	github.com/pinecone-io/go-pinecone v1.1.1
 	github.com/pkoukk/tiktoken-go v0.1.6
 	github.com/redis/rueidis v1.0.34
 	github.com/weaviate/weaviate v1.24.1
@@ -224,7 +224,7 @@ require (
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/tools v0.14.0
 	google.golang.org/api v0.183.0
-	google.golang.org/grpc v1.64.0
+	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.1
 	sigs.k8s.io/yaml v1.3.0
 )

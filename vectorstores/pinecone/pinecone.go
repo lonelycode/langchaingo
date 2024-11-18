@@ -64,7 +64,12 @@ func (s Store) AddDocuments(ctx context.Context,
 
 	nameSpace := s.getNameSpace(opts)
 
-	indexConn, err := s.client.IndexWithNamespace(s.host, nameSpace)
+	in := pinecone.NewIndexConnParams{
+		Host:      s.host,
+		Namespace: nameSpace,
+	}
+
+	indexConn, err := s.client.Index(in)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +121,7 @@ func (s Store) AddDocuments(ctx context.Context,
 		)
 	}
 
-	_, err = indexConn.UpsertVectors(&ctx, pineconeVectors)
+	_, err = indexConn.UpsertVectors(ctx, pineconeVectors)
 	if err != nil {
 		return nil, err
 	}
@@ -130,16 +135,21 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 	opts := s.getOptions(options...)
 
 	nameSpace := s.getNameSpace(opts)
-	indexConn, err := s.client.IndexWithNamespace(s.host, nameSpace)
+	in := pinecone.NewIndexConnParams{
+		Host:      s.host,
+		Namespace: nameSpace,
+	}
+
+	indexConn, err := s.client.Index(in)
 	if err != nil {
 		return nil, err
 	}
 	defer indexConn.Close()
 
-	var protoFilterStruct *structpb.Struct
+	// var protoFilterStruct *structpb.Struct
 	filters := s.getFilters(opts)
 	if filters != nil {
-		protoFilterStruct, err = s.createProtoStructFilter(filters)
+		// protoFilterStruct, err = s.createProtoStructFilter(filters)
 		if err != nil {
 			return nil, err
 		}
@@ -156,11 +166,11 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 	}
 
 	queryResult, err := indexConn.QueryByVectorValues(
-		&ctx,
+		ctx,
 		&pinecone.QueryByVectorValuesRequest{
-			Vector:          vector,
-			TopK:            uint32(numDocuments),
-			Filter:          protoFilterStruct,
+			Vector: vector,
+			TopK:   uint32(numDocuments),
+			//Filter:          protoFilterStruct,
 			IncludeMetadata: true,
 			IncludeValues:   true,
 		},
