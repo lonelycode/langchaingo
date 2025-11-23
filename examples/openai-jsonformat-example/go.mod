@@ -1,8 +1,8 @@
 module github.com/tmc/langchaingo/examples/openai-jsonformat-example
 
-go 1.23
+go 1.24.3
 
-require github.com/tmc/langchaingo v0.1.13-pre.0.0.20250106145851-f1fde1f9e4a0
+require github.com/tmc/langchaingo v0.1.14-pre.4
 
 require (
 	github.com/dlclark/regexp2 v1.10.0 // indirect
