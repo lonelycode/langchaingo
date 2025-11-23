@@ -3,37 +3,33 @@ package chroma
 import (
 	"context"
 
-	chromatypes "github.com/amikos-tech/chroma-go/types"
+	chromaembeddings "github.com/amikos-tech/chroma-go/pkg/embeddings"
 	"github.com/tmc/langchaingo/embeddings"
 )
 
-var _ chromatypes.EmbeddingFunction = chromaGoEmbedder{} // compile-time check
+var _ chromaembeddings.EmbeddingFunction = chromaGoEmbedder{} // compile-time check
 
 // chromaGoEmbedder adapts an 'embeddings.Embedder' to a 'chroma_go.EmbeddingFunction'.
 type chromaGoEmbedder struct {
 	embeddings.Embedder
 }
 
-func (e chromaGoEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([]*chromatypes.Embedding, error) {
+func (e chromaGoEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([]chromaembeddings.Embedding, error) {
 	_embeddings, err := e.Embedder.EmbedDocuments(ctx, texts)
 	if err != nil {
 		return nil, err
 	}
-	_chrmembeddings := make([]*chromatypes.Embedding, len(_embeddings))
+	_chrmembeddings := make([]chromaembeddings.Embedding, len(_embeddings))
 	for i, emb := range _embeddings {
-		_chrmembeddings[i] = chromatypes.NewEmbeddingFromFloat32(emb)
+		_chrmembeddings[i] = chromaembeddings.NewEmbeddingFromFloat32(emb)
 	}
 	return _chrmembeddings, nil
 }
 
-func (e chromaGoEmbedder) EmbedQuery(ctx context.Context, text string) (*chromatypes.Embedding, error) {
+func (e chromaGoEmbedder) EmbedQuery(ctx context.Context, text string) (chromaembeddings.Embedding, error) {
 	_embedding, err := e.Embedder.EmbedQuery(ctx, text)
 	if err != nil {
 		return nil, err
 	}
-	return chromatypes.NewEmbeddingFromFloat32(_embedding), nil
-}
-
-func (e chromaGoEmbedder) EmbedRecords(ctx context.Context, records []*chromatypes.Record, force bool) error {
-	return chromatypes.EmbedRecordsDefaultImpl(e, ctx, records, force)
+	return chromaembeddings.NewEmbeddingFromFloat32(_embedding), nil
 }

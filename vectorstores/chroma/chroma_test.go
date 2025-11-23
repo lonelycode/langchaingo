@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	chromatypes "github.com/amikos-tech/chroma-go/types"
+	chromaembeddings "github.com/amikos-tech/chroma-go/pkg/embeddings"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -83,7 +83,7 @@ func TestChromaGoStoreRest(t *testing.T) {
 	s, err := chroma.New(
 		chroma.WithOpenAIAPIKey(openaiAPIKey),
 		chroma.WithChromaURL(testChromaURL),
-		chroma.WithDistanceFunction(chromatypes.COSINE),
+		chroma.WithDistanceFunction(chromaembeddings.COSINE),
 		chroma.WithNameSpace(getTestNameSpace()),
 		chroma.WithEmbedder(e),
 	)
@@ -122,7 +122,7 @@ func TestChromaStoreRestWithScoreThreshold(t *testing.T) {
 	s, err := chroma.New(
 		chroma.WithOpenAIAPIKey(openaiAPIKey),
 		chroma.WithChromaURL(testChromaURL),
-		chroma.WithDistanceFunction(chromatypes.COSINE),
+		chroma.WithDistanceFunction(chromaembeddings.COSINE),
 		chroma.WithNameSpace(getTestNameSpace()),
 		chroma.WithEmbedder(e),
 	)
@@ -264,7 +264,7 @@ func TestChromaAsRetrieverWithScoreThreshold(t *testing.T) {
 	s, err := chroma.New(
 		chroma.WithOpenAIAPIKey(openaiAPIKey),
 		chroma.WithChromaURL(testChromaURL),
-		chroma.WithDistanceFunction(chromatypes.COSINE),
+		chroma.WithDistanceFunction(chromaembeddings.COSINE),
 		chroma.WithNameSpace(getTestNameSpace()),
 		chroma.WithEmbedder(e),
 	)

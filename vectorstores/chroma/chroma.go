@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"maps"
 
-	chromago "github.com/amikos-tech/chroma-go"
-	"github.com/amikos-tech/chroma-go/openai"
-	chromatypes "github.com/amikos-tech/chroma-go/types"
+	chromav2 "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	chromaembeddings "github.com/amikos-tech/chroma-go/pkg/embeddings"
+	"github.com/amikos-tech/chroma-go/pkg/embeddings/openai"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/schema"
@@ -26,9 +26,9 @@ var (
 
 // Store is a wrapper around the chromaGo API and client.
 type Store struct {
-	client             *chromago.Client
-	collection         *chromago.Collection
-	distanceFunction   chromatypes.DistanceFunction
+	client             chromav2.Client
+	collection         chromav2.Collection
+	distanceFunction   chromaembeddings.DistanceMetric
 	chromaURL          string
 	openaiAPIKey       string
 	openaiOrganization string
@@ -36,7 +36,7 @@ type Store struct {
 	nameSpace    string
 	nameSpaceKey string
 	embedder     embeddings.Embedder
-	includes     []chromatypes.QueryEnum
+	includes     []chromav2.Include
 }
 
 var _ vectorstores.VectorStore = Store{}
@@ -50,17 +50,17 @@ func New(opts ...Option) (Store, error) {
 	}
 
 	// create the client connection and confirm that we can access the server with it
-	chromaClient, err := chromago.NewClient(s.chromaURL)
+	chromaClient, err := chromav2.NewHTTPClient(chromav2.WithBaseURL(s.chromaURL))
 	if err != nil {
 		return s, err
 	}
 
-	if _, errHb := chromaClient.Heartbeat(context.Background()); errHb != nil {
+	if errHb := chromaClient.Heartbeat(context.Background()); errHb != nil {
 		return s, errHb
 	}
 	s.client = chromaClient
 
-	var embeddingFunction chromatypes.EmbeddingFunction
+	var embeddingFunction chromaembeddings.EmbeddingFunction
 	if s.embedder != nil {
 		// inject user's embedding function, if provided
 		embeddingFunction = chromaGoEmbedder{Embedder: s.embedder}
@@ -76,8 +76,13 @@ func New(opts ...Option) (Store, error) {
 		}
 	}
 
-	col, errCc := s.client.CreateCollection(context.Background(), s.nameSpace, map[string]any{}, true,
-		embeddingFunction, s.distanceFunction)
+	// Build collection options - use GetOrCreateCollection which handles create-or-get logic
+	createOpts := []chromav2.CreateCollectionOption{
+		chromav2.WithEmbeddingFunctionCreate(embeddingFunction),
+		chromav2.WithHNSWSpaceCreate(s.distanceFunction),
+	}
+
+	col, errCc := s.client.GetOrCreateCollection(context.Background(), s.nameSpace, createOpts...)
 	if errCc != nil {
 		return s, fmt.Errorf("%w: %w", ErrNewClient, errCc)
 	}
@@ -104,20 +109,36 @@ func (s Store) AddDocuments(ctx context.Context,
 
 	ids := make([]string, len(docs))
 	texts := make([]string, len(docs))
-	metadatas := make([]map[string]any, len(docs))
+	metadatas := make([]chromav2.DocumentMetadata, len(docs))
 	for docIdx, doc := range docs {
 		ids[docIdx] = uuid.New().String() // TODO (noodnik2): find & use something more meaningful
 		texts[docIdx] = doc.PageContent
 		mc := make(map[string]any, 0)
 		maps.Copy(mc, doc.Metadata)
-		metadatas[docIdx] = mc
 		if nameSpace != "" {
-			metadatas[docIdx][s.nameSpaceKey] = nameSpace
+			mc[s.nameSpaceKey] = nameSpace
 		}
+		metadata, err := chromav2.NewDocumentMetadataFromMap(mc)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to create metadata: %w", ErrAddDocument, err)
+		}
+		metadatas[docIdx] = metadata
 	}
 
 	col := s.collection
-	if _, addErr := col.Add(ctx, nil, metadatas, texts, ids); addErr != nil {
+
+	// Convert string IDs to DocumentID type
+	docIDs := make([]chromav2.DocumentID, len(ids))
+	for i, id := range ids {
+		docIDs[i] = chromav2.DocumentID(id)
+	}
+
+	addOpts := []chromav2.CollectionUpdateOption{
+		chromav2.WithIDs(docIDs...),
+		chromav2.WithTexts(texts...),
+		chromav2.WithMetadatas(metadatas...),
+	}
+	if addErr := col.Add(ctx, addOpts...); addErr != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAddDocument, addErr)
 	}
 	return ids, nil
@@ -138,25 +159,53 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 		return nil, stErr
 	}
 
+	// Build query options for V2 API
 	filter := s.getNamespacedFilter(opts)
-	qr, queryErr := s.collection.Query(ctx, []string{query}, safeIntToInt32(numDocuments), filter, nil, s.includes)
+	queryOpts := []chromav2.CollectionQueryOption{
+		chromav2.WithQueryTexts(query),
+		chromav2.WithNResults(numDocuments),
+	}
+	if filter != nil {
+		// Convert map filter to Where clause - for now we'll pass it as-is and let Chroma handle it
+		// TODO: Implement proper Where clause builder if needed
+		queryOpts = append(queryOpts, chromav2.WithWhereQuery(convertMapToWhere(filter)))
+	}
+
+	qr, queryErr := s.collection.Query(ctx, queryOpts...)
 	if queryErr != nil {
 		return nil, queryErr
 	}
 
-	if len(qr.Documents) != len(qr.Metadatas) || len(qr.Metadatas) != len(qr.Distances) {
-		return nil, fmt.Errorf("%w: qr.Documents[%d], qr.Metadatas[%d], qr.Distances[%d]",
-			ErrUnexpectedResponseLength, len(qr.Documents), len(qr.Metadatas), len(qr.Distances))
+	// V2 API returns groups - extract documents from query result
+	docGroups := qr.GetDocumentsGroups()
+	metadataGroups := qr.GetMetadatasGroups()
+	distanceGroups := qr.GetDistancesGroups()
+
+	if len(docGroups) != len(metadataGroups) || len(metadataGroups) != len(distanceGroups) {
+		return nil, fmt.Errorf("%w: docGroups[%d], metadataGroups[%d], distanceGroups[%d]",
+			ErrUnexpectedResponseLength, len(docGroups), len(metadataGroups), len(distanceGroups))
 	}
+
 	var sDocs []schema.Document
-	for docsI := range qr.Documents {
-		for docI := range qr.Documents[docsI] {
-			if score := 1.0 - qr.Distances[docsI][docI]; score >= scoreThreshold {
-				sDocs = append(sDocs, schema.Document{
-					Metadata:    qr.Metadatas[docsI][docI],
-					PageContent: qr.Documents[docsI][docI],
-					Score:       score,
-				})
+	for groupI := range docGroups {
+		docs := docGroups[groupI]
+		metadatas := metadataGroups[groupI]
+		distances := distanceGroups[groupI]
+
+		for docI := range docs {
+			if docI < len(distances) {
+				if score := 1.0 - float32(distances[docI]); score >= scoreThreshold {
+					metadata := make(map[string]any)
+					if docI < len(metadatas) {
+						// Convert DocumentMetadata to map
+						metadata = documentMetadataToMap(metadatas[docI])
+					}
+					sDocs = append(sDocs, schema.Document{
+						Metadata:    metadata,
+						PageContent: docs[docI].ContentString(),
+						Score:       score,
+					})
+				}
 			}
 		}
 	}
@@ -164,13 +213,112 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 	return sDocs, nil
 }
 
+// documentMetadataToMap converts V2 DocumentMetadata to a plain map
+func documentMetadataToMap(dm chromav2.DocumentMetadata) map[string]any {
+	result := make(map[string]any)
+	// Try to cast to impl to access Keys method
+	if dmImpl, ok := dm.(*chromav2.DocumentMetadataImpl); ok {
+		for _, key := range dmImpl.Keys() {
+			if val, ok := dmImpl.GetRaw(key); ok {
+				result[key] = val
+			}
+		}
+	}
+	return result
+}
+
+// convertMapToWhere converts a map filter to a WhereClause
+// This builds Where clauses for simple filters with $eq, $in, $and operators
+func convertMapToWhere(filter map[string]any) chromav2.WhereClause {
+	// Check for $and operator
+	if andClauses, ok := filter["$and"].([]map[string]any); ok {
+		clauses := make([]chromav2.WhereClause, 0, len(andClauses))
+		for _, clause := range andClauses {
+			if wc := convertMapToWhere(clause); wc != nil {
+				clauses = append(clauses, wc)
+			}
+		}
+		if len(clauses) > 0 {
+			return chromav2.And(clauses...)
+		}
+		return nil
+	}
+
+	// Build individual field filters
+	var clauses []chromav2.WhereClause
+	for field, value := range filter {
+		if field == "$and" {
+			continue
+		}
+
+		// Check if value is a filter operator map
+		if opMap, ok := value.(map[string]any); ok {
+			for op, opValue := range opMap {
+				var clause chromav2.WhereClause
+				switch op {
+				case "$eq":
+					clause = buildEqClause(field, opValue)
+				case "$in":
+					if inValues, ok := opValue.([]string); ok {
+						clause = chromav2.InString(field, inValues...)
+					}
+				case "$gte":
+					if floatVal, ok := opValue.(float64); ok {
+						clause = chromav2.GteFloat(field, float32(floatVal))
+					} else if intVal, ok := opValue.(int); ok {
+						clause = chromav2.GteInt(field, intVal)
+					}
+				}
+				if clause != nil {
+					clauses = append(clauses, clause)
+				}
+			}
+		} else {
+			// Direct value - assume equality
+			if clause := buildEqClause(field, value); clause != nil {
+				clauses = append(clauses, clause)
+			}
+		}
+	}
+
+	if len(clauses) == 0 {
+		return nil
+	}
+	if len(clauses) == 1 {
+		return clauses[0]
+	}
+	return chromav2.And(clauses...)
+}
+
+// buildEqClause builds an equality clause based on value type
+func buildEqClause(field string, value any) chromav2.WhereClause {
+	switch v := value.(type) {
+	case string:
+		return chromav2.EqString(field, v)
+	case int:
+		return chromav2.EqInt(field, v)
+	case int64:
+		return chromav2.EqInt(field, int(v))
+	case float32:
+		return chromav2.EqFloat(field, v)
+	case float64:
+		return chromav2.EqFloat(field, float32(v))
+	case bool:
+		return chromav2.EqBool(field, v)
+	default:
+		// Fallback - return nil for unsupported types
+		return nil
+	}
+}
+
 func (s Store) RemoveCollection() error {
 	if s.client == nil || s.collection == nil {
 		return fmt.Errorf("%w: no collection", ErrRemoveCollection)
 	}
-	_, errDc := s.client.DeleteCollection(context.Background(), s.collection.Name)
+	collectionName := s.collection.Name()
+	errDc := s.client.DeleteCollection(context.Background(), collectionName)
 	if errDc != nil {
-		return fmt.Errorf("%w(%s): %w", ErrRemoveCollection, s.collection.Name, errDc)
+		return fmt.Errorf("%w(%s): %w", ErrRemoveCollection, collectionName, errDc)
 	}
 	return nil
 }

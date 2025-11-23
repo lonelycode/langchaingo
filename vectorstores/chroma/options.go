@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	chromatypes "github.com/amikos-tech/chroma-go/types"
-	"github.com/tmc/langchaingo/embeddings"
+	chromav2 "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/amikos-tech/chroma-go/pkg/embeddings"
+	lcembeddings "github.com/tmc/langchaingo/embeddings"
 )
 
 const (
@@ -15,7 +16,7 @@ const (
 	ChromaURLKeyEnvVarName = "CHROMA_URL"
 	DefaultNameSpace       = "langchain"
 	DefaultNameSpaceKey    = "nameSpace"
-	DefaultDistanceFunc    = chromatypes.L2
+	DefaultDistanceFunc    = embeddings.L2
 )
 
 // ErrInvalidOptions is returned when the options given are invalid.
@@ -39,22 +40,23 @@ func WithChromaURL(chromaURL string) Option {
 }
 
 // WithEmbedder is an option for setting the embedder to use.
-func WithEmbedder(e embeddings.Embedder) Option {
+func WithEmbedder(e lcembeddings.Embedder) Option {
 	return func(p *Store) {
 		p.embedder = e
 	}
 }
 
 // WithDistanceFunction specifies the distance function which will be used (default is L2)
-// see: https://github.com/amikos-tech/chroma-go/blob/ab1339d0ee1a863be7d6773bcdedc1cfd08e3d77/types/types.go#L22
-func WithDistanceFunction(distanceFunction chromatypes.DistanceFunction) Option {
+func WithDistanceFunction(distanceFunction embeddings.DistanceMetric) Option {
 	return func(p *Store) {
 		p.distanceFunction = distanceFunction
 	}
 }
 
 // WithIncludes is an option for setting the includes to query the vectors.
-func WithIncludes(includes []chromatypes.QueryEnum) Option {
+// This is deprecated in V2 API as includes are now specified per-operation.
+// Kept for backward compatibility but may not have effect.
+func WithIncludes(includes []chromav2.Include) Option {
 	return func(p *Store) {
 		p.includes = includes
 	}
