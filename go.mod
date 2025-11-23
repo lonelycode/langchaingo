@@ -39,7 +39,7 @@ require (
 
 // Vector stores
 require (
-	github.com/amikos-tech/chroma-go v0.2.0
+	github.com/amikos-tech/chroma-go v0.2.5
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.0
 	github.com/opensearch-project/opensearch-go v1.1.0
 	github.com/pgvector/pgvector-go v0.1.1
@@ -327,7 +327,7 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
-	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect

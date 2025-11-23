@@ -133,7 +133,7 @@ func (s Store) AddDocuments(ctx context.Context,
 		docIDs[i] = chromav2.DocumentID(id)
 	}
 
-	addOpts := []chromav2.CollectionUpdateOption{
+	addOpts := []chromav2.CollectionAddOption{
 		chromav2.WithIDs(docIDs...),
 		chromav2.WithTexts(texts...),
 		chromav2.WithMetadatas(metadatas...),
