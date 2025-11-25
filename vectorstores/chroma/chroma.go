@@ -213,14 +213,23 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 	return sDocs, nil
 }
 
-// documentMetadataToMap converts V2 DocumentMetadata to a plain map
+// documentMetadataToMap converts V2 DocumentMetadata to a plain map.
+// We use type-specific getters instead of GetRaw because DocumentMetadataImpl.GetRaw
+// returns a MetadataValue struct rather than the unwrapped primitive value.
 func documentMetadataToMap(dm chromav2.DocumentMetadata) map[string]any {
 	result := make(map[string]any)
 	// Try to cast to impl to access Keys method
 	if dmImpl, ok := dm.(*chromav2.DocumentMetadataImpl); ok {
 		for _, key := range dmImpl.Keys() {
-			if val, ok := dmImpl.GetRaw(key); ok {
-				result[key] = val
+			// Use type-specific getters to extract actual values
+			if str, ok := dmImpl.GetString(key); ok {
+				result[key] = str
+			} else if i, ok := dmImpl.GetInt(key); ok {
+				result[key] = i
+			} else if f, ok := dmImpl.GetFloat(key); ok {
+				result[key] = f
+			} else if b, ok := dmImpl.GetBool(key); ok {
+				result[key] = b
 			}
 		}
 	}
