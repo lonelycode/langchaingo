@@ -16,6 +16,11 @@ type CallOptions struct {
 	MaxTokens int `json:"max_tokens"`
 	// Temperature is the temperature for sampling, between 0 and 1.
 	Temperature float64 `json:"temperature"`
+	// TemperatureSet reports whether WithTemperature was applied. Temperature
+	// is a plain float64, so 0 is ambiguous: it is both a valid sampling
+	// temperature and the zero value. Providers that must omit an unset
+	// temperature from the wire request check this instead of comparing to 0.
+	TemperatureSet bool `json:"-"`
 	// StopWords is a list of words to stop on.
 	StopWords []string `json:"stop_words"`
 	// StreamingFunc is a function to be called for each chunk of a streaming response.
@@ -142,6 +147,7 @@ func WithCandidateCount(c int) CallOption {
 func WithTemperature(temperature float64) CallOption {
 	return func(o *CallOptions) {
 		o.Temperature = temperature
+		o.TemperatureSet = true
 	}
 }
 

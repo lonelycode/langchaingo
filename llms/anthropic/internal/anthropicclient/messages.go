@@ -40,7 +40,7 @@ type messagePayload struct {
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	StopWords   []string      `json:"stop_sequences,omitempty"`
 	Stream      bool          `json:"stream,omitempty"`
-	Temperature float64       `json:"temperature"`
+	Temperature *float64      `json:"temperature,omitempty"`
 	Tools       []Tool        `json:"tools,omitempty"`
 	TopP        float64       `json:"top_p,omitempty"`
 

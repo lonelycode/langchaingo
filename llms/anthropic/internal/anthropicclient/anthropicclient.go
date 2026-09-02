@@ -90,7 +90,7 @@ func New(token string, model string, baseURL string, opts ...Option) (*Client, e
 type CompletionRequest struct {
 	Model       string   `json:"model"`
 	Prompt      string   `json:"prompt"`
-	Temperature float64  `json:"temperature"`
+	Temperature *float64 `json:"temperature,omitempty"`
 	MaxTokens   int      `json:"max_tokens_to_sample,omitempty"`
 	StopWords   []string `json:"stop_sequences,omitempty"`
 	TopP        float64  `json:"top_p,omitempty"`
@@ -130,7 +130,7 @@ type MessageRequest struct {
 	Model       string        `json:"model"`
 	Messages    []ChatMessage `json:"messages"`
 	System      string        `json:"system,omitempty"`
-	Temperature float64       `json:"temperature"`
+	Temperature *float64      `json:"temperature,omitempty"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	TopP        float64       `json:"top_p,omitempty"`
 	Tools       []Tool        `json:"tools,omitempty"`

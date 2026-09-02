@@ -28,10 +28,11 @@ func TestClient_CreateCompletion(t *testing.T) {
 
 	client.UseLegacyTextCompletionsAPI = true
 
+	temperature := 0.0
 	req := &CompletionRequest{
 		Model:       "claude-3-haiku-20240307",
 		Prompt:      "\n\nHuman: Hello, how are you?\n\nAssistant:",
-		Temperature: 0.0,
+		Temperature: &temperature,
 		MaxTokens:   100,
 	}
 
