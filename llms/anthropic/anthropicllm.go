@@ -114,7 +114,7 @@ func generateCompletionsContent(ctx context.Context, o *LLM, messages []llms.Mes
 		Prompt:        prompt,
 		MaxTokens:     opts.MaxTokens,
 		StopWords:     opts.StopWords,
-		Temperature:   opts.Temperature,
+		Temperature:   temperatureFromOptions(opts),
 		TopP:          opts.TopP,
 		StreamingFunc: opts.StreamingFunc,
 	})
@@ -151,7 +151,7 @@ func generateMessagesContent(ctx context.Context, o *LLM, messages []llms.Messag
 		System:                 systemPrompt,
 		MaxTokens:              opts.MaxTokens,
 		StopWords:              opts.StopWords,
-		Temperature:            opts.Temperature,
+		Temperature:            temperatureFromOptions(opts),
 		TopP:                   opts.TopP,
 		Tools:                  tools,
 		Thinking:               thinking,
@@ -603,4 +603,16 @@ func extractThinkingFromText(fullText string) (thinkingContent, outputContent st
 
 	// If no thinking tags found, treat entire text as output
 	return "", fullText
+}
+
+// temperatureFromOptions returns the temperature to put on the wire, or nil
+// when the caller never asked for one. Anthropic rejects `temperature` on
+// models that have deprecated it, so an unset value must be omitted rather
+// than sent as the zero value; an explicit WithTemperature(0) is still sent.
+func temperatureFromOptions(opts *llms.CallOptions) *float64 {
+	if opts == nil || !opts.TemperatureSet {
+		return nil
+	}
+	temperature := opts.Temperature
+	return &temperature
 }
