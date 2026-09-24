@@ -210,11 +210,17 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 		}
 	}
 
-	// Extract reasoning effort for thinking models
-	// Note: OpenAI o1/o3 models have built-in reasoning and don't support reasoning_effort parameter
-	// This is kept for future models that might support it (like GPT-5)
+	// Reasoning effort, sent verbatim when the caller set it with
+	// WithReasoningEffort and omitted otherwise (the model's default applies).
 	var reasoningEffort string
-	// Commented out for now since current o1 models don't support this parameter
+	if opts.Metadata != nil {
+		if effort, ok := opts.Metadata["openai:reasoning_effort"].(string); ok {
+			reasoningEffort = effort
+		}
+	}
+	// Mapping a generic ThinkingConfig onto reasoning_effort stays disabled:
+	// its low/medium/high modes cannot express none/minimal/xhigh, and which
+	// values a model accepts varies, so only an explicit effort is sent.
 	/*
 		if opts.Metadata != nil {
 			if config, ok := opts.Metadata["thinking_config"].(*llms.ThinkingConfig); ok {

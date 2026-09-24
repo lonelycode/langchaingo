@@ -37,3 +37,17 @@ func WithLegacyMaxTokensField() llms.CallOption {
 		opts.Metadata["openai:use_legacy_max_tokens"] = true
 	}
 }
+
+// WithReasoningEffort sets reasoning_effort on the request, verbatim. The
+// accepted values ("none", "minimal", "low", "medium", "high", "xhigh", ...)
+// and the default differ per model, so the value is not checked here, and
+// nothing is sent when the option is absent or effort is empty: the model's
+// own default then applies.
+func WithReasoningEffort(effort string) llms.CallOption {
+	return func(opts *llms.CallOptions) {
+		if opts.Metadata == nil {
+			opts.Metadata = make(map[string]interface{})
+		}
+		opts.Metadata["openai:reasoning_effort"] = effort
+	}
+}
