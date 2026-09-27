@@ -170,8 +170,25 @@ func generateMessagesContent(ctx context.Context, o *LLM, messages []llms.Messag
 
 // processAnthropicResponse converts Anthropic API response to standard ContentResponse
 func processAnthropicResponse(result *anthropicclient.MessageResponsePayload) (*llms.ContentResponse, error) {
-	if result == nil || len(result.Content) == 0 {
+	if result == nil {
 		return nil, ErrEmptyResponse
+	}
+	// Anthropic answers content: [] when a turn ends before the model writes
+	// anything (a tiny max_tokens, an immediate end_turn). That is a
+	// successful, billed response: return one empty choice that keeps the
+	// stop reason and the usage rather than an error.
+	if len(result.Content) == 0 {
+		return &llms.ContentResponse{
+			Choices: []*llms.ContentChoice{{
+				StopReason: result.StopReason,
+				GenerationInfo: map[string]any{
+					"InputTokens":              result.Usage.InputTokens,
+					"OutputTokens":             result.Usage.OutputTokens,
+					"CacheCreationInputTokens": result.Usage.CacheCreationInputTokens,
+					"CacheReadInputTokens":     result.Usage.CacheReadInputTokens,
+				},
+			}},
+		}, nil
 	}
 
 	choices := make([]*llms.ContentChoice, len(result.Content))
